@@ -10,6 +10,7 @@ import os
 
     Bloom, BigScience Large Open-science Open-access Multilingual Language Model
     model: https://bigscience.huggingface.co/blog/bloom
+    konkretnie używam wersji bloom-1b7
 
     autor: wikipop (https://github.com/wikipop)
     
@@ -28,14 +29,14 @@ discord_token: str = os.environ.get("TOKEN")
 # Inicjacja modelu "BLOOM"
 if os.name == 'nt':
     # Na etapie developmentu musiałem zmienić cache modelu bo nie miałem miejsca na dysku C
-    model = AutoModelForCausalLM.from_pretrained("bigscience/bloom", use_cache=True, cache_dir="F:/.cache")
-    tokenizer = AutoTokenizer.from_pretrained("bbigscience/bloom", cache_dir="F:/.cache")
+    model = AutoModelForCausalLM.from_pretrained("bigscience/bloom-560m", use_cache=True, cache_dir="F:/.cache")
+    tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-560m", cache_dir="F:/.cache")
 else:
     # Program jest przeznaczony do działania na moim serwerze (debian) a tam nie mam problemu z miejscem
-    model = AutoModelForCausalLM.from_pretrained("bigscience/bloom", use_cache=True)
-    tokenizer = AutoTokenizer.from_pretrained("bbigscience/bloom")
+    model = AutoModelForCausalLM.from_pretrained("bigscience/bloom-560m", use_cache=True)
+    tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-560m")
 
-torch.set_default_tensor_type(torch.FloatTensor)
+torch.set_default_tensor_type(torch.cuda.FloatTensor)
 print(model.__class__.__name__)
 
 
@@ -51,17 +52,19 @@ def generate_prompt(user_input: str, result_len: int = 200) -> str:
     :return: str
     """
 
+    print(f"Zaczynam generowanie: {user_input} : {type(user_input)}")
+
     # Walidacja danych podanych przez użytkownika
     if not user_input:
         return "No user input specified"
         pass
 
-    prompt: str = user_input
+    prompt: str = str(user_input)
 
     # Przygotowanie promptu
     input_ids = tokenizer(prompt, return_tensors="pt").to(0)
     # Generowanie rezultatu na podstawie podanego promptu
-    sample = model.generate(**input_ids, max_length={result_len}, top_k=1, temperature=0.9, repetition_penalty=2.0)
+    sample = model.generate(**input_ids, max_length=200, top_k=1, temperature=0.9, repetition_penalty=2.0)
     # Dekodowanie i przypisanie rezultatu do zmiennej
     result: str = tokenizer.decode(sample[0], truncate_before_pattern=[r"\n\n^#", "^'''", "\n\n\n"])
     print(result)
@@ -73,7 +76,8 @@ def generate_prompt(user_input: str, result_len: int = 200) -> str:
 """
     CLIENT
 """
-# Tworzenie zamiarów bota (boilerplate wymagany przez discord)
+
+# Deklaracja zamiarów aplikacji (boilerplate wymagany przez discord)
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -81,13 +85,12 @@ intents.message_content = True
 # Praktycznie cała ta klasa to boilerplate także nie widzę potrzeby rozpisywania się nad nią
 class MyClient(discord.Client):
     def __init__(self):
-        # Przekazywanie zamiarów
         super().__init__(intents=intents)
         self.synced = False
 
     # Logika włączania bota i synchronizacji komend
     async def on_ready(self) -> None:
-        await self.wait_until_ready()
+        await client.wait_until_ready()
         if not self.synced:
             await tree.sync()
             self.synced = True
@@ -102,12 +105,9 @@ tree = app_commands.CommandTree(client)
 
 # Logika pobierania promptu użytkownika i wyświetlania go.
 @tree.command(name="generuj", description="generowanie rezultatu przy użyciu modelu Bloom")
-async def generuj(interaction: discord.Interaction, prompt: str, result_length: int):
-    await interaction.response.send_message(f"Rezultat: {generate_prompt(prompt, result_length)}")
+async def generuj(interaction: discord.Interaction, prompt: str):
+    await interaction.response.send_message(f"Rezultat: {generate_prompt(prompt)}")
 
 
 # Inicjacja klienta (bota discord)
-intents = discord.Intents.default()
-intents.message_content = True
-client = MyClient()
 client.run(discord_token)
