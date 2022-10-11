@@ -29,8 +29,7 @@ discord_token: str = os.environ.get("TOKEN")
 # Inicjacja modelu "BLOOM"
 if os.name == 'nt':
     # Na etapie developmentu musiałem zmienić cache modelu, bo nie miałem miejsca na dysku C
-    model = AutoModelForCausalLM.from_pretrained("bigscience/bloom-560m", use_cache=True, cache_dir="F:/.cache").to(
-        'cuda:0')
+    model = AutoModelForCausalLM.from_pretrained("bigscience/bloom-560m", use_cache=True, cache_dir="F:/.cache").to('cuda:0')
     tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-560m", cache_dir="F:/.cache")
 else:
     # Program jest przeznaczony do działania na moim serwerze (debian) a tam nie mam problemu z miejscem
@@ -105,8 +104,11 @@ tree = app_commands.CommandTree(client)
 # Logika pobierania promptu użytkownika i wyświetlania go.
 @tree.command(name="generuj", description="generowanie rezultatu przy użyciu modelu Bloom")
 async def generuj(interaction: discord.Interaction, prompt: str):
+    # Deklaracja odpowiedzi (w przeciwnym wypadku skrypt ma 3 sekundy na odpowiedź)
     await interaction.response.defer()
+    # Generowanie rezultatu
     result: str = generate_prompt(prompt)
+    # Wysłanie rezultatu
     await interaction.followup.send(f"Rezultat: {result}")
 
 
