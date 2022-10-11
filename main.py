@@ -13,7 +13,7 @@ import os
     konkretnie używam wersji bloom-1b7
 
     autor: wikipop (https://github.com/wikipop)
-    
+
     Skrypt wymaga pliku .env z zapisanym tokenem bota discord w postaci
     TOKEN=xxx
 """
@@ -29,11 +29,12 @@ discord_token: str = os.environ.get("TOKEN")
 # Inicjacja modelu "BLOOM"
 if os.name == 'nt':
     # Na etapie developmentu musiałem zmienić cache modelu, bo nie miałem miejsca na dysku C
-    model = AutoModelForCausalLM.from_pretrained("bigscience/bloom-560m", use_cache=True, cache_dir="F:/.cache")
+    model = AutoModelForCausalLM.from_pretrained("bigscience/bloom-560m", use_cache=True, cache_dir="F:/.cache").to(
+        'cuda:0')
     tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-560m", cache_dir="F:/.cache")
 else:
     # Program jest przeznaczony do działania na moim serwerze (debian) a tam nie mam problemu z miejscem
-    model = AutoModelForCausalLM.from_pretrained("bigscience/bloom-560m", use_cache=True)
+    model = AutoModelForCausalLM.from_pretrained("bigscience/bloom-560m", use_cache=True).to('cuda:0')
     tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-560m")
 
 torch.set_default_tensor_type(torch.cuda.FloatTensor)
@@ -60,7 +61,7 @@ def generate_prompt(user_input: str, result_len: int = 200) -> str:
     prompt: str = str(user_input)
 
     # Przygotowanie promptu
-    input_ids = tokenizer(prompt, return_tensors="pt").to(0)
+    input_ids = tokenizer(prompt, return_tensors="pt").to('cuda:0')
     # Generowanie rezultatu na podstawie podanego promptu
     sample = model.generate(**input_ids, max_length=result_len, top_k=1, temperature=0.9, repetition_penalty=2.0)
     # Dekodowanie i przypisanie rezultatu do zmiennej
@@ -104,7 +105,9 @@ tree = app_commands.CommandTree(client)
 # Logika pobierania promptu użytkownika i wyświetlania go.
 @tree.command(name="generuj", description="generowanie rezultatu przy użyciu modelu Bloom")
 async def generuj(interaction: discord.Interaction, prompt: str):
-    await interaction.response.send_message(f"Rezultat: {generate_prompt(prompt)}")
+    await interaction.response.defer()
+    result: str = generate_prompt(prompt)
+    await interaction.followup.send(f"Rezultat: {result}")
 
 
 # Inicjacja klienta (bota discord)
